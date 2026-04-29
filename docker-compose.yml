@@ -1,0 +1,43 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# docker-compose.yml — SUP (testes locais com banco ChromaDB existente)
+#
+# USO:
+#   cp .env.example .env        # configure GROQ_API_KEY e WEB_TOKEN
+#   docker compose up --build   # sobe o servidor
+#   curl http://localhost:8000/health
+# ══════════════════════════════════════════════════════════════════════════════
+
+version: "3.9"
+
+services:
+  sup-web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sup-web
+    ports:
+      - "8000:8000"
+
+    # Carrega variáveis do .env local (não commitar em produção)
+    env_file: .env
+
+    volumes:
+      # Monta o banco ChromaDB existente — :ro evita escrita acidental
+      # Ajuste os caminhos via variáveis de ambiente no .env
+      - ${RAG_PASTA_CHROMA:-~/Documentos/rag_base/chroma_db}:/data/chroma_db
+      - ${RAG_PASTA_SAIDA:-~/Documentos/rag_base}:/data/rag_base:ro
+
+    environment:
+      # Sobrescreve os caminhos para apontar para os volumes do container
+      - RAG_PASTA_CHROMA=/data/chroma_db
+      - RAG_PASTA_SAIDA=/data/rag_base
+
+    restart: unless-stopped
+
+    # Healthcheck espelha o Dockerfile para o Docker Compose monitorar
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 90s
+      retries: 3

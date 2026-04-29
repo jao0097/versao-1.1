@@ -1,0 +1,656 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SUP — Sistema de Apoio Clínico Dr. Ajuda</title>
+
+  <!-- marked.js para renderização de Markdown -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+
+  <style>
+    /* ── Variáveis de cor clínica ── */
+    :root {
+      --azul-primario: #1a56db;
+      --azul-escuro:   #1e3a8a;
+      --azul-claro:    #e8f0fe;
+      --azul-medio:    #bfdbfe;
+      --cinza-texto:   #1f2937;
+      --cinza-leve:    #f3f4f6;
+      --cinza-borda:   #d1d5db;
+      --vermelho-aviso:#dc2626;
+      --verde-ok:      #16a34a;
+      --branco:        #ffffff;
+      --sombra:        0 2px 8px rgba(0,0,0,0.10);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--azul-claro);
+      color: var(--cinza-texto);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--azul-escuro);
+      color: var(--branco);
+      padding: 1rem 1.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: var(--sombra);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    header h1 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    header p {
+      font-size: 0.72rem;
+      opacity: 0.75;
+      margin-top: 2px;
+    }
+    .header-logo { display: flex; flex-direction: column; }
+    #btn-sair {
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.35);
+      color: var(--branco);
+      padding: 0.4rem 0.9rem;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 0.82rem;
+      transition: background 0.2s;
+    }
+    #btn-sair:hover { background: rgba(255,255,255,0.28); }
+
+    /* ── Tela de login ── */
+    #tela-login {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem;
+    }
+    .login-card {
+      background: var(--branco);
+      border-radius: 12px;
+      box-shadow: var(--sombra);
+      padding: 2.5rem 2rem;
+      width: 100%;
+      max-width: 420px;
+    }
+    .login-card h2 {
+      font-size: 1.25rem;
+      color: var(--azul-escuro);
+      margin-bottom: 0.4rem;
+    }
+    .login-card .subtitulo {
+      font-size: 0.82rem;
+      color: #6b7280;
+      margin-bottom: 1.6rem;
+      line-height: 1.5;
+    }
+    .aviso-login {
+      background: #fef3c7;
+      border: 1px solid #f59e0b;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      font-size: 0.8rem;
+      color: #92400e;
+      margin-bottom: 1.5rem;
+      line-height: 1.5;
+    }
+    label { font-size: 0.85rem; font-weight: 600; display: block; margin-bottom: 0.4rem; }
+    input[type="password"], input[type="text"], textarea {
+      width: 100%;
+      padding: 0.65rem 0.85rem;
+      border: 1.5px solid var(--cinza-borda);
+      border-radius: 8px;
+      font-size: 0.95rem;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+    input[type="password"]:focus,
+    input[type="text"]:focus,
+    textarea:focus { border-color: var(--azul-primario); }
+
+    .btn-primario {
+      width: 100%;
+      background: var(--azul-primario);
+      color: var(--branco);
+      border: none;
+      border-radius: 8px;
+      padding: 0.75rem;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 1.1rem;
+      transition: background 0.2s, transform 0.1s;
+    }
+    .btn-primario:hover { background: var(--azul-escuro); }
+    .btn-primario:active { transform: scale(0.98); }
+    .btn-primario:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    #erro-login {
+      color: var(--vermelho-aviso);
+      font-size: 0.82rem;
+      margin-top: 0.6rem;
+      display: none;
+    }
+
+    /* ── Tela principal ── */
+    #tela-app {
+      flex: 1;
+      display: none;
+      flex-direction: column;
+      padding: 1.5rem;
+      gap: 1.25rem;
+      max-width: 900px;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    /* ── Área de pergunta ── */
+    .card {
+      background: var(--branco);
+      border-radius: 12px;
+      box-shadow: var(--sombra);
+      padding: 1.5rem;
+    }
+    .card h2 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--azul-escuro);
+      margin-bottom: 1rem;
+    }
+    #campo-pergunta {
+      resize: vertical;
+      min-height: 110px;
+      font-size: 0.95rem;
+      line-height: 1.55;
+    }
+
+    .acoes-consulta {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 0.85rem;
+      flex-wrap: wrap;
+    }
+    #btn-consultar {
+      flex: 1;
+      min-width: 140px;
+      background: var(--azul-primario);
+      color: var(--branco);
+      border: none;
+      border-radius: 8px;
+      padding: 0.7rem 1.2rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    #btn-consultar:hover:not(:disabled) { background: var(--azul-escuro); }
+    #btn-consultar:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    /* ── Spinner ── */
+    .spinner-wrap {
+      display: none;
+      align-items: center;
+      gap: 0.6rem;
+      font-size: 0.85rem;
+      color: #6b7280;
+    }
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2.5px solid var(--azul-medio);
+      border-top-color: var(--azul-primario);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Área de resposta ── */
+    #area-resposta {
+      display: none;
+    }
+    .resposta-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+    .resposta-meta h2 { margin: 0; }
+    .resposta-badges { display: flex; gap: 0.5rem; align-items: center; }
+    .badge {
+      font-size: 0.72rem;
+      padding: 0.25rem 0.6rem;
+      border-radius: 999px;
+      font-weight: 600;
+      background: var(--azul-claro);
+      color: var(--azul-primario);
+    }
+    .badge-tempo { background: #f0fdf4; color: var(--verde-ok); }
+
+    #conteudo-resposta {
+      font-size: 0.93rem;
+      line-height: 1.7;
+      color: var(--cinza-texto);
+    }
+    /* Estilo para o Markdown renderizado */
+    #conteudo-resposta h1,
+    #conteudo-resposta h2,
+    #conteudo-resposta h3 {
+      color: var(--azul-escuro);
+      margin: 1.1em 0 0.4em;
+    }
+    #conteudo-resposta h3 { font-size: 1rem; }
+    #conteudo-resposta p  { margin: 0.6em 0; }
+    #conteudo-resposta ul,
+    #conteudo-resposta ol { padding-left: 1.4em; margin: 0.5em 0; }
+    #conteudo-resposta li { margin: 0.3em 0; }
+    #conteudo-resposta hr { border: none; border-top: 1.5px solid var(--cinza-borda); margin: 1.2em 0; }
+    #conteudo-resposta code {
+      background: var(--cinza-leve);
+      padding: 0.1em 0.4em;
+      border-radius: 4px;
+      font-size: 0.85em;
+    }
+    #conteudo-resposta blockquote {
+      border-left: 3px solid var(--azul-primario);
+      padding-left: 1em;
+      color: #4b5563;
+    }
+    #conteudo-resposta strong { color: var(--azul-escuro); }
+
+    .btn-copiar {
+      background: var(--cinza-leve);
+      border: 1px solid var(--cinza-borda);
+      border-radius: 6px;
+      padding: 0.4rem 0.8rem;
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .btn-copiar:hover { background: var(--azul-claro); }
+
+    /* ── Histórico ── */
+    #area-historico { display: none; }
+    .historico-lista {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .historico-item {
+      background: var(--cinza-leve);
+      border: 1px solid var(--cinza-borda);
+      border-radius: 8px;
+      padding: 0.65rem 1rem;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: background 0.15s;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .historico-item:hover { background: var(--azul-claro); border-color: var(--azul-primario); }
+    .historico-item .tempo { font-size: 0.7rem; color: #9ca3af; flex-shrink: 0; }
+
+    /* ── Erro ── */
+    #area-erro {
+      display: none;
+      background: #fef2f2;
+      border: 1.5px solid #fca5a5;
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+      color: var(--vermelho-aviso);
+      font-size: 0.88rem;
+    }
+
+    /* ── Rodapé: aviso legal ── */
+    footer {
+      background: var(--azul-escuro);
+      color: rgba(255,255,255,0.80);
+      text-align: center;
+      padding: 0.85rem 1.5rem;
+      font-size: 0.75rem;
+      line-height: 1.6;
+      position: sticky;
+      bottom: 0;
+      z-index: 100;
+    }
+    footer strong { color: var(--branco); }
+
+    /* ── Responsividade mobile ── */
+    @media (max-width: 600px) {
+      header { padding: 0.85rem 1rem; }
+      #tela-app { padding: 1rem; }
+      .card { padding: 1.1rem; }
+      .acoes-consulta { flex-direction: column; }
+      #btn-consultar { width: 100%; }
+    }
+  </style>
+</head>
+
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="header-logo">
+    <h1>🩺 SUP — Dr. Ajuda</h1>
+    <p>Sistema de Apoio à Decisão Clínica</p>
+  </div>
+  <button id="btn-sair" onclick="sair()" style="display:none">Sair</button>
+</header>
+
+<!-- ══════════════════════════════════════ -->
+<!-- TELA DE LOGIN                         -->
+<!-- ══════════════════════════════════════ -->
+<div id="tela-login">
+  <div class="login-card">
+    <h2>Acesso Restrito</h2>
+    <p class="subtitulo">
+      Este sistema é destinado <strong>exclusivamente a profissionais de saúde</strong>
+      cadastrados. Insira seu token de acesso para continuar.
+    </p>
+    <div class="aviso-login">
+      ⚠️ As respostas são de apoio à decisão e <strong>não substituem</strong>
+      o julgamento clínico, o exame físico nem as diretrizes das sociedades médicas.
+    </div>
+    <label for="campo-token">Token de Acesso</label>
+    <input
+      type="password"
+      id="campo-token"
+      placeholder="Cole seu token aqui"
+      autocomplete="off"
+      onkeydown="if(event.key==='Enter') fazerLogin()"
+    />
+    <p id="erro-login">Token inválido. Verifique com o administrador.</p>
+    <button class="btn-primario" onclick="fazerLogin()">Entrar no Sistema</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════ -->
+<!-- TELA PRINCIPAL                        -->
+<!-- ══════════════════════════════════════ -->
+<div id="tela-app">
+
+  <!-- Formulário de consulta -->
+  <div class="card">
+    <h2>🔍 Nova Consulta Clínica</h2>
+    <textarea
+      id="campo-pergunta"
+      placeholder="Ex.: Quais os critérios diagnósticos para síndrome metabólica e como tratar?&#10;&#10;Seja específico — inclua contexto clínico, fármacos, exames ou síndromes de interesse."
+    ></textarea>
+    <div class="acoes-consulta">
+      <button id="btn-consultar" onclick="fazerConsulta()">
+        💬 Consultar Base do Dr. Ajuda
+      </button>
+      <div class="spinner-wrap" id="spinner">
+        <div class="spinner"></div>
+        <span>Consultando base clínica... pode levar até 30s</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Área de erro -->
+  <div id="area-erro">
+    <strong>⚠️ Erro na consulta:</strong> <span id="mensagem-erro"></span>
+  </div>
+
+  <!-- Área de resposta -->
+  <div id="area-resposta" class="card">
+    <div class="resposta-meta">
+      <h2 class="card-titulo">📋 Resposta Clínica</h2>
+      <div class="resposta-badges">
+        <span class="badge" id="badge-modelo">—</span>
+        <span class="badge badge-tempo" id="badge-tempo">—</span>
+        <button class="btn-copiar" onclick="copiarResposta()">📋 Copiar</button>
+      </div>
+    </div>
+    <div id="conteudo-resposta"></div>
+  </div>
+
+  <!-- Histórico local -->
+  <div id="area-historico" class="card">
+    <h2>🕐 Consultas Recentes (esta sessão)</h2>
+    <ul class="historico-lista" id="lista-historico"></ul>
+  </div>
+
+</div>
+
+<!-- RODAPÉ — aviso legal fixo -->
+<footer>
+  <strong>⚠️ Aviso de Apoio Clínico</strong> — Este sistema é destinado
+  <strong>exclusivamente a profissionais de saúde habilitados</strong>.
+  As respostas baseiam-se no conteúdo do Dr. Ajuda e <strong>não substituem</strong>
+  o julgamento clínico, o exame físico do paciente nem as diretrizes oficiais das
+  sociedades médicas. O médico assistente é inteiramente responsável pela conduta final.
+</footer>
+
+<!-- ══════════════════════════════════════ -->
+<!-- JAVASCRIPT                            -->
+<!-- ══════════════════════════════════════ -->
+<script>
+  "use strict";
+
+  // ── Estado da aplicação ──────────────────────────────────────────────────
+  const MAX_HISTORICO = 5;
+  let _historico = [];        // [{pergunta, resposta, tempo, ts}]
+  let _respostaAtual = "";
+
+  // ── Inicialização ────────────────────────────────────────────────────────
+  document.addEventListener("DOMContentLoaded", () => {
+    const token = sessionStorage.getItem("sup_token");
+    if (token) {
+      mostrarApp();
+    } else {
+      mostrarLogin();
+    }
+  });
+
+  // ── Login ────────────────────────────────────────────────────────────────
+  async function fazerLogin() {
+    const token = document.getElementById("campo-token").value.trim();
+    if (!token) return;
+
+    // Valida o token consultando /status (requer auth)
+    try {
+      const res = await fetch("/status", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.status === 401) {
+        document.getElementById("erro-login").style.display = "block";
+        return;
+      }
+      if (!res.ok) {
+        // Servidor pode estar subindo — aceita token e deixa falhar na consulta
+      }
+    } catch (e) {
+      // Sem rede: aceita o token e tenta depois
+    }
+
+    sessionStorage.setItem("sup_token", token);
+    document.getElementById("erro-login").style.display = "none";
+    mostrarApp();
+  }
+
+  function sair() {
+    sessionStorage.removeItem("sup_token");
+    _historico = [];
+    document.getElementById("campo-pergunta").value = "";
+    esconderResposta();
+    document.getElementById("btn-sair").style.display = "none";
+    mostrarLogin();
+  }
+
+  function mostrarLogin() {
+    document.getElementById("tela-login").style.display = "flex";
+    document.getElementById("tela-app").style.display = "none";
+    setTimeout(() => document.getElementById("campo-token").focus(), 100);
+  }
+
+  function mostrarApp() {
+    document.getElementById("tela-login").style.display = "none";
+    document.getElementById("tela-app").style.display = "flex";
+    document.getElementById("btn-sair").style.display = "block";
+    setTimeout(() => document.getElementById("campo-pergunta").focus(), 100);
+  }
+
+  // ── Consulta via SSE ─────────────────────────────────────────────────────
+  function fazerConsulta() {
+    const token = sessionStorage.getItem("sup_token");
+    const pergunta = document.getElementById("campo-pergunta").value.trim();
+
+    if (!pergunta) {
+      mostrarErro("Digite uma consulta clínica antes de enviar.");
+      return;
+    }
+    if (!token) {
+      sair();
+      return;
+    }
+
+    iniciarLoading();
+
+    const params = new URLSearchParams({ pergunta, token });
+    const url = `/consultar/stream?${params}`;
+    const es = new EventSource(url);
+
+    es.onmessage = (evt) => {
+      let data;
+      try { data = JSON.parse(evt.data); } catch { return; }
+
+      if (data.tipo === "resposta") {
+        const tempo = data.tempo_resposta_s;
+        const modelo = data.modelo_usado || "—";
+        _respostaAtual = data.resposta;
+        finalizarLoading();
+        mostrarResposta(data.resposta, modelo, tempo);
+        adicionarHistorico(pergunta, data.resposta, tempo);
+        es.close();
+      } else if (data.tipo === "erro") {
+        finalizarLoading();
+        mostrarErro(data.mensagem || "Erro desconhecido.");
+        es.close();
+      } else if (data.tipo === "fim") {
+        es.close();
+      }
+    };
+
+    es.onerror = () => {
+      finalizarLoading();
+      mostrarErro(
+        "Falha na conexão com o servidor. Verifique sua rede e tente novamente."
+      );
+      es.close();
+    };
+  }
+
+  // ── Loading ──────────────────────────────────────────────────────────────
+  function iniciarLoading() {
+    esconderResposta();
+    document.getElementById("area-erro").style.display = "none";
+    document.getElementById("btn-consultar").disabled = true;
+    document.getElementById("spinner").style.display = "flex";
+  }
+
+  function finalizarLoading() {
+    document.getElementById("btn-consultar").disabled = false;
+    document.getElementById("spinner").style.display = "none";
+  }
+
+  // ── Exibir resposta ──────────────────────────────────────────────────────
+  function mostrarResposta(texto, modelo, tempo) {
+    document.getElementById("badge-modelo").textContent = modelo;
+    document.getElementById("badge-tempo").textContent = `⏱ ${tempo}s`;
+    document.getElementById("conteudo-resposta").innerHTML =
+      marked.parse(texto || "");
+    document.getElementById("area-resposta").style.display = "block";
+    document.getElementById("area-resposta").scrollIntoView({ behavior: "smooth" });
+  }
+
+  function esconderResposta() {
+    document.getElementById("area-resposta").style.display = "none";
+    _respostaAtual = "";
+  }
+
+  function mostrarErro(msg) {
+    document.getElementById("mensagem-erro").textContent = msg;
+    document.getElementById("area-erro").style.display = "block";
+    document.getElementById("area-erro").scrollIntoView({ behavior: "smooth" });
+  }
+
+  // ── Copiar resposta ──────────────────────────────────────────────────────
+  function copiarResposta() {
+    if (!_respostaAtual) return;
+    navigator.clipboard.writeText(_respostaAtual).then(() => {
+      const btn = document.querySelector(".btn-copiar");
+      btn.textContent = "✅ Copiado!";
+      setTimeout(() => (btn.textContent = "📋 Copiar"), 2000);
+    });
+  }
+
+  // ── Histórico de consultas (sessionStorage) ──────────────────────────────
+  function adicionarHistorico(pergunta, resposta, tempo) {
+    const ts = new Date().toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+    _historico.unshift({ pergunta, resposta, tempo, ts });
+    if (_historico.length > MAX_HISTORICO) _historico.pop();
+    renderizarHistorico();
+  }
+
+  function renderizarHistorico() {
+    const lista = document.getElementById("lista-historico");
+    const area  = document.getElementById("area-historico");
+
+    if (_historico.length === 0) {
+      area.style.display = "none";
+      return;
+    }
+    area.style.display = "block";
+    lista.innerHTML = _historico.map((h, i) => `
+      <li class="historico-item" onclick="recuperarHistorico(${i})">
+        <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+          🔍 ${_escaparHtml(h.pergunta.slice(0, 90))}${h.pergunta.length > 90 ? "…" : ""}
+        </span>
+        <span class="tempo">${h.ts} · ${h.tempo}s</span>
+      </li>
+    `).join("");
+  }
+
+  function recuperarHistorico(idx) {
+    const h = _historico[idx];
+    if (!h) return;
+    document.getElementById("campo-pergunta").value = h.pergunta;
+    _respostaAtual = h.resposta;
+    mostrarResposta(h.resposta, "cache", h.tempo);
+  }
+
+  // ── Utilitários ──────────────────────────────────────────────────────────
+  function _escaparHtml(str) {
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  // Permitir Ctrl+Enter para enviar
+  document.addEventListener("keydown", (e) => {
+    if (e.ctrlKey && e.key === "Enter") fazerConsulta();
+  });
+</script>
+
+</body>
+</html>

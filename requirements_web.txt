@@ -1,0 +1,34 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# requirements_web.txt — Dependências do sistema SUP (web)
+# Versões fixadas para reprodutibilidade em produção
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ── PyTorch CPU-only (evita baixar 1.5GB de drivers NVIDIA desnecessários) ───
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.3.0+cpu
+
+# ── Core RAG (herdadas do super.py) ──────────────────────────────────────────
+requests==2.31.0
+beautifulsoup4==4.12.3
+chromadb==1.5.8
+groq==0.9.0
+sentence-transformers==3.0.1
+youtube-transcript-api==0.6.2
+lxml==5.2.2
+
+# ── Web ───────────────────────────────────────────────────────────────────────
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+python-multipart==0.0.9
+jinja2==3.1.4
+slowapi==0.1.9
+
+# ── Compatibilidade (groq==0.9.0 requer httpx<0.28) ──────────────────────────
+httpx==0.27.0
+
+# ── Utilitários ───────────────────────────────────────────────────────────────
+python-dotenv==1.0.1
+
+# ── Observabilidade (opcional — Student Pack Sentry) ─────────────────────────
+# Comente as linhas abaixo se não quiser usar Sentry
+# sentry-sdk[fastapi]==2.7.1
