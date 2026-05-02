@@ -1,15 +1,41 @@
 # ══════════════════════════════════════════════════════════════════════════════
-# docker-compose.yml — SUP (testes locais com banco ChromaDB existente)
+# docker-compose.yml — SUP (multi-usuário com ChromaDB em servidor dedicado)
+#
+# ARQUITETURA:
+#   chroma   → ChromaDB como servidor HTTP (porta 8001 no host)
+#   sup-web  → FastAPI + Uvicorn com 4 workers, conecta ao chroma via HTTP
 #
 # USO:
 #   cp .env.example .env        # configure GROQ_API_KEY e WEB_TOKEN
-#   docker compose up --build   # sobe o servidor
+#   docker compose up --build   # sobe os dois containers
 #   curl http://localhost:8000/health
+#
+# INDEXAÇÃO (com os dois containers rodando):
+#   CHROMA_HOST=localhost CHROMA_PORT=8001 python super.py --artigos ...
+#   CHROMA_HOST=localhost CHROMA_PORT=8001 python super.py --video ...
 # ══════════════════════════════════════════════════════════════════════════════
 
-version: "3.9"
-
 services:
+
+  # ── ChromaDB — banco vetorial como servidor HTTP dedicado ──────────────────
+  # Roda em container próprio para que múltiplos workers Uvicorn possam
+  # ler/escrever simultaneamente sem corrupção de arquivo.
+  chroma:
+    image: chromadb/chroma:latest
+    container_name: sup-chroma
+    ports:
+      - "8001:8000"   # exposto no host na porta 8001 para indexação local
+    volumes:
+      # Banco persistido — container usa /data como persist_path
+      - ${RAG_PASTA_CHROMA:-~/Documentos/rag_base/chroma_db}:/data
+    environment:
+      - IS_PERSISTENT=TRUE
+      - ANONYMIZED_TELEMETRY=FALSE
+    restart: unless-stopped
+    # Sem healthcheck — a imagem não tem curl/wget/python no PATH.
+    # O sup-web usa sleep 5 para dar tempo do chroma inicializar.
+
+  # ── SUP — API FastAPI com 4 workers Uvicorn ────────────────────────────────
   sup-web:
     build:
       context: .
@@ -22,19 +48,25 @@ services:
     env_file: .env
 
     volumes:
-      # Monta o banco ChromaDB existente — :ro evita escrita acidental
-      # Ajuste os caminhos via variáveis de ambiente no .env
-      - ${RAG_PASTA_CHROMA:-~/Documentos/rag_base/chroma_db}:/data/chroma_db
+      # Pasta de saída montada somente leitura (arquivos .txt, .json de indexação)
       - ${RAG_PASTA_SAIDA:-~/Documentos/rag_base}:/data/rag_base:ro
 
     environment:
-      # Sobrescreve os caminhos para apontar para os volumes do container
-      - RAG_PASTA_CHROMA=/data/chroma_db
+      # Caminhos internos do container
       - RAG_PASTA_SAIDA=/data/rag_base
+      - RAG_PASTA_CHROMA=/data/rag_base/chroma_db  # mantido para compatibilidade do CLI
+
+      # Aponta o super.py para o servidor ChromaDB (não mais PersistentClient)
+      - CHROMA_HOST=chroma
+      - CHROMA_PORT=8000
+
+    # Aguarda o chroma iniciar e dá 5s extras para ele estar pronto
+    depends_on:
+      - chroma
+    command: ["sh", "-c", "sleep 5 && uvicorn web_api:app --host 0.0.0.0 --port 8000 --workers 4 --timeout-keep-alive 90"]
 
     restart: unless-stopped
 
-    # Healthcheck espelha o Dockerfile para o Docker Compose monitorar
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s

@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SUP | Apoio Clínico Inteligente</title>
+  <meta name="description" content="SUP é uma plataforma de apoio clínico com IA para médicos, com foco em produtividade, rastreabilidade e segurança." />
+  <meta property="og:title" content="SUP | Apoio Clínico Inteligente" />
+  <meta property="og:description" content="Acelere a tomada de decisão clínica com contexto estruturado e respostas em linguagem médica." />
+
+  <meta property="og:type" content="website" />
+  <style>
+    :root {
+      --bg:           #f0f7fb;
+      --bg-alt:       #e6f3f9;
+      --surface:      #ffffff;
+      --surface-soft: #f7fbfe;
+      --text:         #0d2233;
+      --text-soft:    #3a5a72;
+      --muted:        #6b8fa8;
+      --primary:      #0099b8;
+      --primary-light:#00c2de;
+      --primary-pale: #d6f4f9;
+      --accent:       #d4a017;
+      --accent-light: #f0c84a;
+      --accent-pale:  #fef6da;
+      --border:       rgba(0, 153, 184, 0.15);
+      --border-soft:  rgba(0, 153, 184, 0.08);
+      --radius:       14px;
+      --radius-lg:    20px;
+      --shadow:       0 2px 18px rgba(0, 100, 140, 0.08);
+      --shadow-md:    0 6px 32px rgba(0, 100, 140, 0.13);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.6;
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ── TOPBAR ── */
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: rgba(255,255,255,0.94);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+      box-shadow: 0 1px 8px rgba(0,100,140,0.06);
+    }
+
+    .topbar-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 1.4rem;
+      min-height: 66px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.65rem;
+    }
+
+    .brand-icon {
+      width: 38px;
+      height: 38px;
+      background: linear-gradient(135deg, var(--primary), var(--primary-light));
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 12px rgba(0,153,184,0.3);
+      flex-shrink: 0;
+    }
+
+    .brand-icon svg { width: 20px; height: 20px; }
+
+    .brand-text {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.01em;
+    }
+
+    .brand-text span {
+      display: block;
+      font-size: 0.7rem;
+      font-weight: 400;
+      color: var(--muted);
+      letter-spacing: 0.01em;
+    }
+
+    .cta-topbar {
+      background: linear-gradient(135deg, var(--primary), var(--primary-light));
+      color: #fff;
+      border: none;
+      text-decoration: none;
+      padding: 0.55rem 1.1rem;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 0.88rem;
+      box-shadow: 0 2px 12px rgba(0,153,184,0.3);
+      transition: filter 180ms, transform 180ms;
+    }
+
+    .cta-topbar:hover { filter: brightness(1.08); transform: translateY(-1px); }
+
+    /* ── WRAP ── */
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 0 1.4rem; }
+
+    /* ── HERO ── */
+    .hero {
+      padding: 5rem 0 3.5rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: "";
+      position: absolute;
+      top: -80px; right: -120px;
+      width: 480px; height: 480px;
+      background: radial-gradient(circle, rgba(0,194,222,0.12), transparent 65%);
+      pointer-events: none;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      bottom: -40px; left: -80px;
+      width: 320px; height: 320px;
+      background: radial-gradient(circle, rgba(212,160,23,0.1), transparent 65%);
+      pointer-events: none;
+    }
+
+    .hero-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: var(--accent-pale);
+      border: 1px solid rgba(212,160,23,0.25);
+      color: #9a6e00;
+      border-radius: 999px;
+      padding: 0.3rem 0.85rem;
+      font-size: 0.78rem;
+      font-weight: 600;
+      margin-bottom: 1.2rem;
+      letter-spacing: 0.01em;
+    }
+
+    .hero-tag::before { content: "✦"; font-size: 0.65rem; }
+
+    h1 {
+      font-size: clamp(2rem, 5vw, 3.2rem);
+      font-weight: 800;
+      line-height: 1.1;
+      margin-bottom: 1rem;
+      letter-spacing: -0.025em;
+      color: var(--text);
+      max-width: 700px;
+    }
+
+    h1 em {
+      font-style: normal;
+      color: var(--primary);
+    }
+
+    .lead {
+      color: var(--text-soft);
+      max-width: 620px;
+      line-height: 1.72;
+      font-size: 1.02rem;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 1.6rem;
+      flex-wrap: wrap;
+    }
+
+    .btn-primary {
+      text-decoration: none;
+      border-radius: 12px;
+      padding: 0.8rem 1.5rem;
+      font-weight: 700;
+      font-size: 0.95rem;
+      background: linear-gradient(135deg, var(--primary), var(--primary-light));
+      color: #fff;
+      border: none;
+      box-shadow: 0 4px 20px rgba(0,153,184,0.3);
+      transition: filter 180ms, transform 180ms, box-shadow 180ms;
+      cursor: pointer;
+    }
+
+    .btn-primary:hover {
+      filter: brightness(1.07);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 28px rgba(0,153,184,0.38);
+    }
+
+    .btn-outline {
+      text-decoration: none;
+      border-radius: 12px;
+      padding: 0.8rem 1.4rem;
+      font-weight: 600;
+      font-size: 0.93rem;
+      background: transparent;
+      color: var(--primary);
+      border: 2px solid var(--primary);
+      cursor: pointer;
+      transition: background 180ms, color 180ms;
+    }
+
+    .btn-outline:hover {
+      background: var(--primary-pale);
+      color: var(--primary);
+    }
+
+    /* ── TRUST BAR ── */
+    .trust-bar {
+      background: var(--surface);
+      border-top: 1px solid var(--border-soft);
+      border-bottom: 1px solid var(--border-soft);
+      padding: 1rem 0;
+    }
+
+    .trust-inner {
+      display: flex;
+      gap: 2rem;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .trust-item {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      font-size: 0.83rem;
+      color: var(--text-soft);
+      font-weight: 500;
+    }
+
+    .trust-item .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--accent);
+      flex-shrink: 0;
+    }
+
+    /* ── SECTIONS ── */
+    section { padding: 3rem 0; }
+
+    .section-header {
+      margin-bottom: 2rem;
+    }
+
+    .section-tag {
+      display: inline-block;
+      background: var(--primary-pale);
+      color: var(--primary);
+      border-radius: 999px;
+      padding: 0.25rem 0.75rem;
+      font-size: 0.73rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      margin-bottom: 0.65rem;
+    }
+
+    .section-title {
+      font-size: 1.65rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      line-height: 1.2;
+    }
+
+    /* ── STEPS GRID ── */
+    .steps-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.25rem;
+    }
+
+    .step-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 1.6rem 1.4rem;
+      box-shadow: var(--shadow);
+      transition: box-shadow 200ms, transform 200ms;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .step-card::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 4px;
+      background: linear-gradient(90deg, var(--primary), var(--primary-light));
+    }
+
+    .step-card:hover {
+      box-shadow: var(--shadow-md);
+      transform: translateY(-3px);
+    }
+
+    .step-num {
+      width: 36px; height: 36px;
+      background: var(--primary-pale);
+      border: 1.5px solid var(--primary);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--primary);
+      margin-bottom: 0.9rem;
+    }
+
+    .step-card h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 0.5rem;
+    }
+
+    .step-card p {
+      font-size: 0.88rem;
+      color: var(--text-soft);
+      line-height: 1.6;
+    }
+
+    /* ── FEATURES GRID ── */
+    .features-section {
+      background: var(--surface);
+      border-radius: var(--radius-lg);
+      padding: 2.5rem;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--border-soft);
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 1.5rem;
+    }
+
+    .feature-item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+
+    .feature-icon {
+      width: 42px; height: 42px;
+      background: linear-gradient(135deg, var(--primary-pale), rgba(0,153,184,0.08));
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--primary);
+      font-size: 1.1rem;
+    }
+
+    .feature-item h3 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .feature-item p {
+      font-size: 0.86rem;
+      color: var(--text-soft);
+      line-height: 1.6;
+    }
+
+    /* ── FAQ ── */
+    .faq-section {
+      background: var(--accent-pale);
+      border: 1px solid rgba(212,160,23,0.2);
+      border-radius: var(--radius-lg);
+      padding: 2rem 2.2rem;
+    }
+
+    .faq-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 1.1rem;
+    }
+
+    .faq-list li {
+      padding-bottom: 1.1rem;
+      border-bottom: 1px solid rgba(212,160,23,0.18);
+    }
+
+    .faq-list li:last-child {
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .faq-q {
+      font-weight: 700;
+      color: var(--text);
+      font-size: 0.92rem;
+      margin-bottom: 0.3rem;
+    }
+
+    .faq-a {
+      font-size: 0.87rem;
+      color: var(--text-soft);
+      line-height: 1.65;
+    }
+
+    /* ── FOOTER ── */
+    .foot {
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      padding: 1.4rem 0;
+    }
+
+    .foot-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 0 1.4rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .foot-aviso {
+      font-size: 0.8rem;
+      color: var(--muted);
+      line-height: 1.65;
+      max-width: 760px;
+    }
+
+    .foot-aviso strong { color: var(--text-soft); }
+
+    @media (max-width: 880px) {
+      .steps-grid,
+      .features-grid { grid-template-columns: 1fr; }
+      .trust-inner { flex-direction: column; gap: 0.8rem; align-items: flex-start; padding-left: 1.4rem; }
+      .foot-inner { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="topbar-inner">
+      <div class="brand">
+        <div class="brand-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          SUP | Sistema de Apoio Clínico
+          <span>Decisão clínica assistida por IA</span>
+        </div>
+      </div>
+      <a class="cta-topbar" href="/app">Entrar na plataforma</a>
+    </div>
+  </header>
+
+  <main>
+    <!-- HERO -->
+    <div class="wrap">
+      <section class="hero">
+        <div class="hero-tag">Plataforma para profissionais de saúde</div>
+        <h1>IA clínica com foco em <em>produtividade</em>, critério e segurança.</h1>
+        <p class="lead">
+          O SUP organiza o contexto relevante do caso para apoiar a tomada de decisão médica com respostas em linguagem clínica.
+          Não substitui a conduta profissional — potencializa o tempo do médico e a consistência do atendimento.
+        </p>
+        <div class="hero-actions">
+          <a class="btn-primary" href="/app">Entrar na plataforma</a>
+        </div>
+      </section>
+    </div>
+
+    <!-- TRUST BAR -->
+    <div class="trust-bar">
+      <div class="wrap">
+        <div class="trust-inner">
+          <div class="trust-item"><span class="dot"></span>Acesso protegido por token</div>
+          <div class="trust-item"><span class="dot"></span>Respostas em linguagem médica</div>
+          <div class="trust-item"><span class="dot"></span>Histórico de sessão rastreável</div>
+          <div class="trust-item"><span class="dot"></span>Motor RAG com base clínica</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COMO FUNCIONA -->
+    <div class="wrap">
+      <section>
+        <div class="section-header">
+          <div class="section-tag">Como funciona</div>
+          <h2 class="section-title">Três passos para apoio à decisão</h2>
+        </div>
+        <div class="steps-grid">
+          <div class="step-card">
+            <div class="step-num">1</div>
+            <h3>Descreva sua dúvida clínica</h3>
+            <p>Digite a pergunta clínica com o contexto do caso. Quanto mais detalhes você fornecer, maior será a qualidade da resposta gerada.</p>
+          </div>
+          <div class="step-card">
+            <div class="step-num">2</div>
+            <h3>A base de conhecimento é consultada</h3>
+            <p>O sistema combina recuperação de conhecimento médico com um modelo de linguagem para gerar uma resposta objetiva e estruturada.</p>
+          </div>
+          <div class="step-card">
+            <div class="step-num">3</div>
+            <h3>Revise e tome sua decisão</h3>
+            <p>Utilize o conteúdo gerado como apoio e aplique o seu julgamento clínico, os protocolos institucionais e as diretrizes oficiais vigentes das sociedades médicas.</p>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- RECURSOS -->
+    <div class="wrap">
+      <section>
+        <div class="section-header">
+          <div class="section-tag">Recursos e confiabilidade</div>
+          <h2 class="section-title">Ferramentas para o dia a dia clínico</h2>
+        </div>
+        <div class="features-section">
+          <div class="features-grid">
+            <div class="feature-item">
+              <div class="feature-icon">🕓</div>
+              <h3>Histórico de sessão</h3>
+              <p>Retome consultas anteriores para comparar respostas, manter consistência entre atendimentos e acelerar revisões clínicas durante a mesma sessão.</p>
+            </div>
+            <div class="feature-item">
+              <div class="feature-icon">📋</div>
+              <h3>Respostas estruturadas</h3>
+              <p>O conteúdo é formatado em Markdown, facilitando a leitura rápida, a cópia e a exportação para os fluxos de trabalho internos.</p>
+            </div>
+            <div class="feature-item">
+              <div class="feature-icon">🔒</div>
+              <h3>Controles de uso seguro</h3>
+              <p>A plataforma é destinada exclusivamente a profissionais habilitados. A responsabilidade pela conduta clínica final é sempre do médico assistente.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <!-- FAQ -->
+    <div class="wrap">
+      <section>
+        <div class="section-header">
+          <div class="section-tag">Perguntas frequentes</div>
+          <h2 class="section-title">Tire suas dúvidas</h2>
+        </div>
+        <div class="faq-section">
+          <ul class="faq-list">
+            <li>
+              <div class="faq-q">O SUP substitui as diretrizes oficiais ou o julgamento médico?</div>
+              <div class="faq-a">Não. O SUP é um sistema de apoio à decisão clínica, não um sistema de decisão autônoma. A conduta clínica final é sempre de responsabilidade do médico assistente.</div>
+            </li>
+            <li>
+              <div class="faq-q">É possível acessar a plataforma sem token?</div>
+              <div class="faq-a">Não. O acesso à plataforma é protegido por token de autenticação. Entre em contato com o administrador do sistema para obter suas credenciais de acesso.</div>
+            </li>
+            <li>
+              <div class="faq-q">O sistema pode ser utilizado para fins de treinamento?</div>
+              <div class="faq-a">Sim. O SUP pode ser utilizado para discussão técnica e simulação de casos clínicos, sempre sob a supervisão de um profissional habilitado.</div>
+            </li>
+          </ul>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="foot">
+    <div class="foot-inner">
+      <p class="foot-aviso">
+        <strong>Aviso:</strong> o SUP é um sistema de apoio clínico. Não substitui o exame físico, o contexto assistencial,
+        o julgamento médico nem os protocolos institucionais e as diretrizes das sociedades médicas.
+      </p>
+    </div>
+  </footer>
+
+</body>
+</html>

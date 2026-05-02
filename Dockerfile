@@ -52,11 +52,13 @@ HEALTHCHECK \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # ── Comando de inicialização ──────────────────────────────────────────────────
-# CRÍTICO: --workers 1 — ChromaDB com PersistentClient usa file-lock exclusivo.
-# Múltiplos workers causam corrupção silenciosa do banco vetorial.
+# --workers 4  — ChromaDB agora roda como servidor HTTP separado (container chroma),
+#               portanto múltiplos workers Uvicorn são seguros.
+#               Regra geral: 2× o número de CPUs disponíveis.
+#               Ajuste conforme o hardware do servidor.
 # --timeout-keep-alive 90 — pipeline clínico pode demorar até ~60s com retry Groq.
 CMD ["uvicorn", "web_api:app", \
      "--host", "0.0.0.0", \
      "--port", "8000", \
-     "--workers", "1", \
+     "--workers", "4", \
      "--timeout-keep-alive", "90"]

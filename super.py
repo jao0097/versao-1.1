@@ -141,161 +141,120 @@ AVISO_MEDICO = (
 )
 
 PROMPT_METADADOS_SISTEMA = (
-    "Você é um analista de conteúdo médico para um sistema RAG de apoio clínico,\n"
-    "baseado no conhecimento do Dr. Ajuda (canal e site).\n"
-    "Tarefa: extrair metadados clínicos úteis e conservadores do conteúdo fornecido.\n\n"
-    "Regras críticas:\n"
-    "- Use APENAS o conteúdo fornecido.\n"
-    "- Não invente diagnósticos, medicamentos, doses, valores laboratoriais ou afirmações clínicas.\n"
-    "- Preserve a terminologia médica exata (nomes de doenças, fármacos, CID, procedimentos).\n"
-    "- Se não der para inferir algo com segurança, use string vazia (\"\") ou lista vazia ([]).\n"
-    "- Retorne APENAS um JSON válido (objeto), sem markdown e sem texto extra.\n"
+    "Você é um indexador clínico especializado em preparar conteúdo médico para recuperação semântica em RAG.\n"
+    "Sua saída alimenta diretamente o ChromaDB — metadados precisos aumentam a recuperabilidade dos chunks.\n\n"
+    "Raciocine em ordem antes de preencher cada campo:\n"
+    "1. Leia o conteúdo identificando a condição/tema central e as entidades clínicas (fármacos, CIDs, procedimentos).\n"
+    "2. Extraia apenas o que está explícito — nunca infira diagnósticos, doses ou afirmações não presentes.\n"
+    "3. Preserve terminologia médica exata; prefira nomes genéricos de fármacos.\n"
+    "4. Se um campo não puder ser preenchido com segurança: \"\" ou [].\n"
+    "5. Retorne APENAS JSON válido, sem markdown, sem texto fora do objeto.\n"
 )
 
 PROMPT_METADADOS_USUARIO_HEADER = (
-    "Retorne JSON com exatamente estas chaves e tipos:\n"
+    "Retorne JSON com estas chaves (sem extras):\n"
     "{\n"
-    '  "resumo": string,                  // 1–3 frases clínicas; fiel ao texto; sem extrapolar\n'
-    '  "palavras_chave": string[],        // 3–8 termos médicos extraídos do texto\n'
-    '  "tema_principal": string,          // 1 frase curta (ex.: "Diagnóstico e tratamento de HAS")\n'
-    '  "topicos_abordados": string[],     // 3–8 tópicos clínicos reais do texto\n'
-    '  "condicoes_clinicas": string[],    // patologias/doenças/síndromes mencionadas (lista; [] se nenhuma)\n'
-    '  "medicamentos": string[],          // fármacos citados — prefira nome genérico ([] se nenhum)\n'
-    '  "procedimentos": string[],         // exames, cirurgias, intervenções, escalas mencionadas ([] se nenhum)\n'
-    '  "especialidade": string,           // área médica principal (ex.: "Cardiologia", "Endocrinologia")\n'
-    '  "nivel_evidencia": string,         // "opinião de especialista" | "revisão narrativa" | "estudo clínico" | "diretriz" | "outro"\n'
+    '  "resumo": string,            // 1–3 frases clínicas fiéis; sem extrapolação\n'
+    '  "palavras_chave": string[],  // 3–8 termos médicos do texto\n'
+    '  "tema_principal": string,    // 1 frase: "Diagnóstico e tratamento de X"\n'
+    '  "topicos_abordados": string[], // 3–8 tópicos clínicos reais\n'
+    '  "condicoes_clinicas": string[], // patologias/síndromes citadas ([] se nenhuma)\n'
+    '  "medicamentos": string[],    // nomes genéricos dos fármacos ([] se nenhum)\n'
+    '  "procedimentos": string[],   // exames, cirurgias, escalas ([] se nenhum)\n'
+    '  "especialidade": string,     // área médica principal\n'
+    '  "nivel_evidencia": "opinião de especialista"|"revisão narrativa"|"estudo clínico"|"diretriz"|"outro",\n'
     '  "nivel_tecnico": "iniciante"|"intermediário"|"avançado",\n'
     '  "linguagem": "pt"|"en"|"outro"\n'
     "}\n"
 )
 
 PROMPT_LIMPEZA_SISTEMA = (
-    "Você é um editor especializado em transcrições médicas (PT/EN) para um sistema RAG de apoio clínico.\n"
-    "Objetivo: melhorar a legibilidade do texto SEM alterar nenhuma informação médica.\n\n"
-    "Regras críticas:\n"
-    "- NÃO resuma nem omita partes do conteúdo.\n"
-    "- NÃO adicione informações, diagnósticos, doses ou interpretações.\n"
-    "- NÃO altere terminologia técnica médica, nomes de fármacos, doses, valores laboratoriais ou de referência.\n"
-    "- Preserve TODOS os números com seu contexto (doses, exames, durações de tratamento, índices).\n"
-    "- Remova marcações como [música], [aplausos], [risadas], [inaudível] e ruídos similares.\n"
-    "- Corrija pontuação e capitalização óbvias, mantendo nomes próprios e siglas médicas intactos.\n"
-    "- Remova repetições de vício de fala APENAS quando claramente redundantes (ex.: 'é é é', 'e e e').\n"
-    "- Insira parágrafos quando houver mudança clara de tema clínico.\n"
-    "- Retorne APENAS o texto limpo, sem comentários, sem cabeçalhos e sem markdown.\n"
-    "- Se indicado 'Trecho N de M', edite apenas o trecho fornecido."
+    "Você é um editor de transcrições médicas preparando texto para indexação semântica em RAG.\n"
+    "Meta: maximizar a recuperabilidade clínica dos chunks — termos médicos precisos e frases completas aumentam hits relevantes.\n\n"
+    "PRESERVAR (prioridade máxima):\n"
+    "- Toda terminologia médica, nomes de fármacos, doses, valores laboratoriais, CIDs, escalas e índices.\n"
+    "- Números sempre com seu contexto ('5 mg/kg/dia', não apenas '5').\n"
+    "- Nomes próprios, siglas médicas e acrônimos.\n\n"
+    "CORRIGIR:\n"
+    "- Pontuação e capitalização óbvias.\n"
+    "- Repetições de vício de fala claramente redundantes ('é é é', 'então então').\n"
+    "- Marcações de ruído: [música], [aplausos], [risadas], [inaudível] e similares.\n"
+    "- Inserir parágrafo a cada mudança clara de tema clínico.\n\n"
+    "PROIBIDO:\n"
+    "- Resumir, omitir ou condensar qualquer trecho.\n"
+    "- Adicionar informações, interpretações ou diagnósticos não presentes.\n\n"
+    "Retorne APENAS o texto limpo, sem comentários, cabeçalhos ou markdown.\n"
+    "Se indicado 'Trecho N de M', edite apenas esse trecho."
 )
 
 PROMPT_CLASSIFICADOR_SISTEMA = (
-    "Você é um classificador de consultas clínicas para um sistema RAG de apoio à decisão médica,\n"
-    "baseado no conhecimento do Dr. Ajuda (canal e site).\n"
-    "Seu papel é escolher o modo de busca mais adequado para a pergunta do médico.\n\n"
-    "Regras críticas:\n"
-    "- Retorne APENAS um JSON válido (objeto), sem markdown.\n"
-    "- Se escolher 'especifica', 'fonte_alvo' DEVE ser exatamente igual a um dos títulos fornecidos.\n"
-    "- Se não tiver certeza do título exato, use tipo 'geral' e fonte_alvo null.\n"
-    "- Use n_chunks exatamente assim: especifica=4, geral=6, comparativa=8, fora_de_escopo=0.\n"
-    "- IMPORTANTE: perguntas sobre condições clínicas, medicamentos, diagnósticos, hipóteses,\n"
-    "  condutas, laudos, exames, sintomas, síndromes, tratamentos, procedimentos, doses,\n"
-    "  interações medicamentosas, CID, especialidades médicas e qualquer tema de saúde\n"
-    "  são SEMPRE pertinentes à base — NUNCA as classifique como 'fora_de_escopo'.\n"
-    "- Reserve 'fora_de_escopo' SOMENTE para perguntas sem nenhuma relação com medicina ou saúde.\n"
+    "Você é o roteador de busca de um sistema RAG clínico. Sua decisão determina quais chunks serão recuperados.\n"
+    "Uma classificação errada desperdiça tokens ou perde informação — seja preciso.\n\n"
+    "Raciocine nesta ordem antes de classificar:\n"
+    "1. ESPECIFICA: algum título da lista corresponde diretamente à pergunta? Se sim → tipo='especifica', fonte_alvo=título exato.\n"
+    "2. COMPARATIVA: a pergunta compara ≥2 condições, tratamentos, fármacos ou abordagens? Se sim → tipo='comparativa'.\n"
+    "3. FORA_DE_ESCOPO: a pergunta não tem nenhuma relação com medicina, saúde ou ciências clínicas? Se sim → tipo='fora_de_escopo'.\n"
+    "4. Caso contrário → tipo='geral'.\n\n"
+    "n_chunks obrigatório: especifica=4 | geral=6 | comparativa=8 | fora_de_escopo=0.\n"
+    "Se não tiver certeza do título exato em 'especifica', use 'geral' com fonte_alvo=null.\n"
+    "Retorne APENAS JSON válido, sem markdown.\n"
 )
 
 PROMPT_ROUTER_CONVERSA_SISTEMA = (
-    "Você é um roteador de intenções para um CLI de RAG clínico (Dr. Ajuda).\n"
-    "A entrada é uma mensagem livre do usuário. Sua tarefa é escolher a ação correta e extrair parâmetros.\n\n"
-    "Regras críticas:\n"
-    "- Retorne APENAS um JSON válido (objeto), sem markdown e sem texto extra.\n"
-    "- Seja conservador: se faltar parâmetro essencial, use null e peça esclarecimento via 'acao':'perguntar_clarificacao'.\n"
-    "- Não invente URLs.\n\n"
-    "Ações possíveis (campo 'acao'):\n"
-    "- 'consultar'                 -> pergunta_clinica: string\n"
-    "- 'status'                    -> sem parâmetros\n"
-    "- 'artigos_lote'              -> entradas: string[]   (URLs soltas e/ou caminho de .txt)\n"
-    "- 'videos_lote'               -> entradas: string[]   (URLs/IDs e/ou caminho de .txt)\n"
-    "- 'crawl_site'                -> url_listagem: string, filtro_path: string|null, sem_paginacao: boolean\n"
-    "- 'processar_local'           -> sem parâmetros\n"
-    "- 'buscar_local'              -> consulta: string|null\n"
-    "- 'reindexar'                 -> url: string\n"
-    "- 'ajuda'                     -> sem parâmetros\n"
-    "- 'sair'                      -> sem parâmetros\n"
-    "- 'perguntar_clarificacao'    -> pergunta: string\n\n"
-    "Dicas de interpretação:\n"
-    "- Se a mensagem contiver claramente um caso/dúvida clínica, prefira 'consultar'.\n"
-    "- Se mencionar 'status', 'estatísticas', 'quantos', prefira 'status'.\n"
-    "- Se contiver links http(s) não-YouTube, tende a ser 'artigos_lote' (a menos que peça crawl/listagem).\n"
-    "- Se contiver link/ID de YouTube, tende a ser 'videos_lote'.\n"
-    "- Se pedir 'crawlear site', 'descobrir links', 'varrer blog', use 'crawl_site'.\n"
-    "- Se pedir 'reindexar'/'forçar reindexação', use 'reindexar'.\n"
-    "- Se pedir para processar arquivos da pasta/locais, use 'processar_local'.\n"
-    "- Se pedir para achar por nome/tema um arquivo local, use 'buscar_local'.\n"
+    "Você é o roteador de intenções de um CLI de RAG clínico (Dr. Ajuda). Retorne APENAS JSON válido, sem markdown.\n\n"
+    "AÇÕES disponíveis → parâmetros obrigatórios:\n"
+    "consultar          → pergunta_clinica: string\n"
+    "artigos_lote       → entradas: string[]  (URLs http/https não-YouTube ou caminho .txt)\n"
+    "videos_lote        → entradas: string[]  (URLs/IDs YouTube ou caminho .txt)\n"
+    "crawl_site         → url_listagem: string, filtro_path: string|null, sem_paginacao: boolean\n"
+    "processar_local    → (sem parâmetros)\n"
+    "buscar_local       → consulta: string|null\n"
+    "reindexar          → url: string\n"
+    "status             → (sem parâmetros)\n"
+    "ajuda              → (sem parâmetros)\n"
+    "sair               → (sem parâmetros)\n"
+    "perguntar_clarificacao → pergunta: string\n\n"
+    "PRIORIDADE de decisão (avalie nesta ordem):\n"
+    "1. Contém dúvida/caso clínico → consultar\n"
+    "2. Contém URL YouTube ou ID de vídeo → videos_lote\n"
+    "3. Contém URL http(s) não-YouTube → artigos_lote (exceto se pedir 'crawl'/'varrer'/'descobrir links' → crawl_site)\n"
+    "4. Pede 'reindexar' + URL → reindexar\n"
+    "5. Pede 'processar' arquivos locais → processar_local\n"
+    "6. Pede 'buscar'/'achar' arquivo local → buscar_local\n"
+    "7. Pede status/estatísticas → status\n"
+    "8. Parâmetro essencial ausente → perguntar_clarificacao (nunca invente URLs)\n"
 )
 
 PROMPT_RESPOSTA_SISTEMA = (
-    "Você é um consultor clínico sênior virtual, baseado EXCLUSIVAMENTE no conhecimento indexado\n"
-    "do Dr. Ajuda (canal e site). Seu interlocutor é sempre um MÉDICO habilitado.\n\n"
-    "Sua função vai além de recuperar informação: você deve INTERPRETAR, SINTETIZAR e ORIENTAR\n"
-    "o raciocínio clínico do médico com base nas fontes disponíveis — como um colega experiente\n"
-    "de interconsulta faria, de forma direta, estruturada e clinicamente relevante.\n\n"
-    "═══════════════════════════════════════════════════════\n"
-    "REGRAS INVIOLÁVEIS\n"
-    "═══════════════════════════════════════════════════════\n"
-    "1. Use APENAS o conteúdo das fontes fornecidas. Nunca extrapole, invente dados clínicos,\n"
-    "   doses não citadas, diagnósticos não embasados ou referências inexistentes.\n"
-    "2. Quando uma informação não constar nas fontes, declare explicitamente:\n"
-    "   'Esta informação específica não foi localizada na base do Dr. Ajuda.'\n"
-    "3. Cite a fonte (título + URL) ao lado de cada afirmação clínica relevante.\n"
-    "   Se múltiplas fontes corroboram, liste todas. Se divergem, apresente ambas as posições\n"
-    "   e sinalize a divergência com '⚠️ Divergência entre fontes:'.\n"
-    "4. Preserve com rigor absoluto: nomes de fármacos, doses, valores laboratoriais,\n"
-    "   escalas clínicas, critérios diagnósticos e CIDs — exatamente como constam nas fontes.\n"
-    "5. Mantenha linguagem técnica e objetiva, adequada a profissionais de saúde.\n"
-    "6. NUNCA produza orientações voltadas diretamente a pacientes.\n"
-    "7. Não inclua disclaimers ou avisos legais — o sistema os adicionará automaticamente.\n\n"
-    "═══════════════════════════════════════════════════════\n"
-    "ESTRUTURA OBRIGATÓRIA DA RESPOSTA\n"
-    "═══════════════════════════════════════════════════════\n"
-    "Organize a resposta nas seções abaixo. Omita apenas as seções que genuinamente não se\n"
-    "aplicam ao tipo de consulta (ex.: sem diagnóstico diferencial em consultas puramente\n"
-    "farmacológicas). Nunca omita '🔍 Análise da Consulta' nem '📚 Fontes Consultadas'.\n\n"
-    "---\n"
+    "Você é um consultor clínico sênior baseado EXCLUSIVAMENTE no conhecimento indexado do Dr. Ajuda.\n"
+    "Interlocutor: sempre um MÉDICO habilitado buscando apoio ao raciocínio clínico.\n\n"
+    "ANTES DE ESCREVER, identifique mentalmente:\n"
+    "- Qual é a questão clínica central implícita na pergunta?\n"
+    "- Quais fontes são mais relevantes para respondê-la?\n"
+    "- As fontes convergem ou divergem? Há lacunas?\n"
+    "Essa análise interna melhora a síntese — não a exiba, use-a para escrever melhor.\n\n"
+    "REGRAS\n"
+    "1. Use APENAS as fontes fornecidas. Nunca extrapole, invente doses, diagnósticos ou referências.\n"
+    "2. Ausência de informação → declare: 'Não localizado na base do Dr. Ajuda.'\n"
+    "3. Cite *(Fonte N — Título)* ao lado de cada dado clínico. Divergência entre fontes → '⚠️ Divergência:'.\n"
+    "4. Preserve exatamente: fármacos, doses, valores laboratoriais, escalas, CIDs.\n"
+    "5. Linguagem técnica. Nunca orientações diretas a pacientes. Sem disclaimers.\n\n"
+    "ESTRUTURA — omita seções genuinamente inaplicáveis; nunca omita 🔍 nem 📚.\n\n"
     "🔍 **Análise da Consulta**\n"
-    "Reenquadre a pergunta do médico com suas próprias palavras clínicas: o que exatamente\n"
-    "está sendo perguntado, qual o contexto clínico implícito e qual será o foco da resposta.\n"
-    "Se a pergunta admitir múltiplas interpretações, explicite qual você está respondendo.\n\n"
-    "---\n"
+    "Reenquadre a pergunta: qual é a questão clínica real, qual contexto está implícito, qual interpretação você responde.\n\n"
     "🧠 **Síntese Clínica**\n"
-    "Responda objetivamente à consulta com base nas fontes. Não apenas liste o que as fontes\n"
-    "dizem — interprete, conecte os pontos e mostre como essas informações se aplicam ao\n"
-    "contexto perguntado. Use parágrafos curtos e densos, não listas soltas.\n"
-    "Cite a fonte ao lado de cada dado relevante: *(Fonte N — Título)*.\n\n"
-    "---\n"
-    "🩺 **Raciocínio Diagnóstico / Diagnóstico Diferencial** *(quando aplicável)*\n"
-    "Se a consulta envolver diagnóstico, hipóteses diagnósticas ou apresentação clínica:\n"
-    "  - Liste os principais diagnósticos a considerar com seus critérios, segundo as fontes.\n"
-    "  - Indique achados que aproximam ou afastam cada hipótese.\n"
-    "  - Destaque o diagnóstico mais provável e por quê, conforme as fontes sugerem.\n\n"
-    "---\n"
+    "Responda diretamente. Interprete e conecte — não liste o que as fontes dizem, mostre o que significam juntas.\n"
+    "Parágrafos densos, sem listas soltas. Cite *(Fonte N)* a cada dado relevante.\n\n"
+    "🩺 **Raciocínio Diagnóstico / DD** *(quando aplicável)*\n"
+    "Hipóteses com critérios, achados que aproximam/afastam cada uma, diagnóstico mais provável justificado.\n\n"
     "💊 **Conduta Clínica** *(quando aplicável)*\n"
-    "Apresente a conduta de forma sequencial e prática:\n"
-    "  - Investigação complementar recomendada (exames, escalas, critérios)\n"
-    "  - Tratamento: fármacos de primeira linha (com doses e esquemas citados nas fontes),\n"
-    "    alternativas e critérios de escalonamento\n"
-    "  - Monitoramento, seguimento e critérios de resposta ao tratamento\n"
-    "  - Critérios de encaminhamento ou referência especializada\n\n"
-    "---\n"
+    "Sequência prática: investigação → tratamento (fármacos + doses das fontes) → monitoramento → critérios de encaminhamento.\n\n"
     "⚠️ **Pontos de Atenção / Red Flags** *(quando aplicável)*\n"
-    "Destaque achados de alarme, contraindicações importantes, interações medicamentosas\n"
-    "relevantes ou situações que exigem conduta imediata — conforme as fontes.\n\n"
-    "---\n"
-    "🔎 **Lacunas na Base de Conhecimento** *(quando houver)*\n"
-    "Liste explicitamente os aspectos da consulta que as fontes disponíveis não cobriram\n"
-    "adequadamente. Isso é mais útil ao médico do que silêncio ou dados inventados.\n\n"
-    "---\n"
+    "Alarmes, contraindicações, interações relevantes, situações que exigem ação imediata.\n\n"
+    "🔎 **Lacunas na Base** *(quando houver)*\n"
+    "O que as fontes não cobriram. Explicitar é mais útil ao médico do que omitir.\n\n"
     "📚 **Fontes Consultadas**\n"
-    "Liste TODAS as fontes efetivamente usadas na resposta:\n"
-    "  - [N] Título completo — URL\n"
-    "  - Tipo: Artigo / Vídeo | Trecho(s): chunk(s) utilizados\n"
+    "[N] Título — URL\n"
 )
 from urllib.parse import urljoin, urlparse, urlencode
 from urllib.request import urlopen
@@ -309,7 +268,7 @@ from chromadb.utils import embedding_functions
 from groq import Groq
 
 # Debug NDJSON — ativo apenas se RAG_DEBUG_LOG estiver definido como caminho válido
-DEBUG_LOG_PATH  = os.getenv("RAG_DEBUG_LOG", "").strip()
+DEBUG_LOG_PATH = os.getenv("RAG_DEBUG_LOG", "").strip()
 DEBUG_SESSION_ID = "sup"
 
 
@@ -336,7 +295,32 @@ def _debug_log(run_id: str, hypothesis_id: str, location: str, message: str, dat
 #  CONFIGURAÇÕES  ← edite aqui ou via variáveis de ambiente
 # ══════════════════════════════════════════════════════════════════════════════
 
-GROQ_API_KEY        = os.getenv("GROQ_API_KEY", "sua_chave_groq_aqui")
+# ── Suporte a múltiplas chaves Groq com rotação automática ────────────────────
+# Opção 1 — variável única com vírgulas: GROQ_API_KEYS=chave1,chave2,chave3
+# Opção 2 — variáveis numeradas:         GROQ_API_KEY=chave1  GROQ_API_KEY_2=chave2 ...
+# As duas formas podem ser combinadas; duplicatas são removidas.
+def _carregar_groq_keys() -> List[str]:
+    """Lê todas as chaves Groq configuradas e retorna lista sem duplicatas."""
+    chaves: List[str] = []
+    # Opção 1: GROQ_API_KEYS separadas por vírgula
+    multi = os.getenv("GROQ_API_KEYS", "").strip()
+    if multi:
+        chaves.extend(k.strip() for k in multi.split(",") if k.strip())
+    # Opção 2: GROQ_API_KEY + GROQ_API_KEY_2, GROQ_API_KEY_3, …
+    for sufixo in ["", "_2", "_3", "_4", "_5"]:
+        k = os.getenv(f"GROQ_API_KEY{sufixo}", "").strip()
+        if k and k not in chaves:
+            chaves.append(k)
+    # Remove placeholder e duplicatas mantendo ordem
+    validas = [k for k in chaves if k and k != "sua_chave_groq_aqui"]
+    seen: List[str] = []
+    for k in validas:
+        if k not in seen:
+            seen.append(k)
+    return seen
+
+GROQ_API_KEY        = os.getenv("GROQ_API_KEY", "sua_chave_groq_aqui")  # mantido p/ compat.
+_GROQ_KEYS: List[str] = _carregar_groq_keys()
 
 _PASTA_PADRAO       = os.path.expanduser("~/Documentos/rag_base")
 PASTA_SAIDA         = os.getenv("RAG_PASTA_SAIDA",  _PASTA_PADRAO)
@@ -359,6 +343,14 @@ LIMPEZA_PAUSA_S     = float(os.getenv("GROQ_LIMPEZA_PAUSA_S", "1.25"))   # pausa
 
 # Metadados
 METADADOS_MAX_CHARS = int(os.getenv("GROQ_METADADOS_MAX_CHARS", "4000"))
+
+# Economia de tokens (consulta)
+# - Quando ligado, reduz contexto enviado e evita enviar lista completa de títulos ao classificador.
+GROQ_ECONOMIA = os.getenv("GROQ_ECONOMIA", "0").strip().lower() in ("1", "true", "yes", "on")
+GROQ_CLASSIF_TITULOS_MAX = max(0, int(os.getenv("GROQ_CLASSIF_TITULOS_MAX", "30")))
+GROQ_CONTEXTO_CHUNK_MAX_CHARS = max(0, int(os.getenv("GROQ_CONTEXTO_CHUNK_MAX_CHARS", "1200")))
+GROQ_CONTEXTO_TOTAL_MAX_CHARS = max(0, int(os.getenv("GROQ_CONTEXTO_TOTAL_MAX_CHARS", "9000")))
+GROQ_MAX_N_CHUNKS = max(0, int(os.getenv("GROQ_MAX_N_CHUNKS", "0")))  # 0 = sem limite extra
 
 # Requisições web
 TIMEOUT           = int(os.getenv("TIMEOUT_REQUISICAO", "15"))
@@ -436,15 +428,88 @@ SELETORES_LIXO = [
 #  VALIDAÇÃO E INICIALIZAÇÃO
 # ══════════════════════════════════════════════════════════════════════════════
 
-GROQ_ENABLED = bool(GROQ_API_KEY and GROQ_API_KEY != "sua_chave_groq_aqui")
+GROQ_ENABLED = bool(_GROQ_KEYS)
 if not GROQ_ENABLED:
     print(
-        "⚠️  GROQ_API_KEY não configurada — recursos de IA (consulta/roteamento/limpeza/metadados) ficam indisponíveis.\n"
-        "   Para habilitar: export GROQ_API_KEY='sua_chave_real'\n",
+        "⚠️  Nenhuma GROQ_API_KEY configurada — recursos de IA ficam indisponíveis.\n"
+        "   Para habilitar: defina GROQ_API_KEY (e opcionalmente GROQ_API_KEY_2) no .env\n",
+        file=sys.stderr,
+    )
+else:
+    _n = len(_GROQ_KEYS)
+    print(
+        f"✅  Groq: {_n} chave{'s' if _n > 1 else ''} carregada{'s' if _n > 1 else ''} "
+        f"({'rotação automática ativa' if _n > 1 else 'chave única'}).",
         file=sys.stderr,
     )
 
-groq_client = Groq(api_key=GROQ_API_KEY) if GROQ_ENABLED else None
+# groq_client mantido para compatibilidade de imports externos
+groq_client = Groq(api_key=_GROQ_KEYS[0]) if GROQ_ENABLED else None
+
+
+import threading as _threading
+
+
+class _GroqKeyPool:
+    """
+    Pool thread-safe de clientes Groq com rotação automática em rate-limit.
+
+    Comportamento:
+    - Enquanto houver chaves não tentadas no round atual: rotaciona imediatamente (sem wait).
+    - Quando todas as chaves do round falharam com 429/503: espera e recomeça.
+    - Repete por GROQ_MAX_RETRIES rounds completos antes de desistir.
+    """
+
+    def __init__(self, keys: List[str]) -> None:
+        self._clients: List[Groq] = [Groq(api_key=k) for k in keys]
+        self._idx: int = 0
+        self._lock = _threading.Lock()
+
+    def _rotate(self) -> None:
+        with self._lock:
+            self._idx = (self._idx + 1) % len(self._clients)
+
+    def create(self, **kwargs):
+        n = len(self._clients)
+        ultimo: Optional[BaseException] = None
+        round_count = 0
+
+        while round_count < GROQ_MAX_RETRIES:
+            keys_tried = 0
+            while keys_tried < n:
+                try:
+                    return self._clients[self._idx].chat.completions.create(**kwargs)
+                except Exception as e:
+                    ultimo = e
+                    if not _groq_retryavel(e):
+                        raise
+                    keys_tried += 1
+                    if keys_tried < n:
+                        ant = self._idx + 1
+                        self._rotate()
+                        print(
+                            f"   🔄  Rate-limit chave {ant}/{n} → chave {self._idx + 1}/{n}",
+                            file=sys.stderr,
+                        )
+            # Todas as chaves falharam neste round
+            round_count += 1
+            if round_count >= GROQ_MAX_RETRIES:
+                break
+            assert ultimo is not None
+            w = _retry_wait(ultimo, round_count)
+            print(
+                f"   ⏸️  Todas as {n} chave(s) em rate-limit — "
+                f"aguardando {w:.1f}s (round {round_count}/{GROQ_MAX_RETRIES})",
+                file=sys.stderr,
+            )
+            time.sleep(w)
+            self._rotate()
+
+        assert ultimo is not None
+        raise ultimo
+
+
+_groq_pool: Optional[_GroqKeyPool] = _GroqKeyPool(_GROQ_KEYS) if GROQ_ENABLED else None
 
 http: Optional[requests.Session] = None
 embedding_fn = None
@@ -471,7 +536,12 @@ def _ensure_db() -> None:
         )
 
     if chroma is None:
-        chroma = chromadb.PersistentClient(path=PASTA_CHROMA)
+        _chroma_host = os.getenv("CHROMA_HOST")
+        _chroma_port = int(os.getenv("CHROMA_PORT", "8000"))
+        if _chroma_host:
+            chroma = chromadb.HttpClient(host=_chroma_host, port=_chroma_port)
+        else:
+            chroma = chromadb.PersistentClient(path=PASTA_CHROMA)
 
     if colecao is None:
         colecao = chroma.get_or_create_collection(
@@ -533,13 +603,20 @@ def chamar_groq(
     json_mode: bool = False,
     temperatura: float = 0.1,
 ) -> str:
-    if not GROQ_ENABLED or groq_client is None:
+    """
+    Chama a API Groq com rotação automática de chaves em rate-limit.
+
+    Com múltiplas chaves (GROQ_API_KEY + GROQ_API_KEY_2, ...):
+      • 429 numa chave → troca para a próxima imediatamente (sem esperar).
+      • Todas as chaves em 429 → aguarda backoff exponencial e recomeça.
+    """
+    if not GROQ_ENABLED or _groq_pool is None:
         raise RuntimeError(
             "GROQ_API_KEY não configurada. Defina a variável de ambiente GROQ_API_KEY para usar recursos de IA."
         )
     kwargs: dict = {
         "model": modelo,
-        "temperature": temperatura,  # padrão baixo para respostas clínicas mais determinísticas
+        "temperature": temperatura,
         "messages": [
             {"role": "system", "content": sistema},
             {"role": "user",   "content": usuario},
@@ -548,21 +625,7 @@ def chamar_groq(
     if json_mode:
         kwargs["response_format"] = {"type": "json_object"}
 
-    ultimo: Optional[BaseException] = None
-    for tentativa in range(GROQ_MAX_RETRIES):
-        try:
-            return groq_client.chat.completions.create(**kwargs).choices[0].message.content
-        except Exception as e:
-            ultimo = e
-            if _groq_retryavel(e) and tentativa < GROQ_MAX_RETRIES - 1:
-                w = _retry_wait(e, tentativa)
-                print(f"   ⏸️  Groq rate-limit — aguardando {w:.1f}s "
-                      f"(tentativa {tentativa + 1}/{GROQ_MAX_RETRIES})")
-                time.sleep(w)
-                continue
-            raise
-    assert ultimo is not None
-    raise ultimo
+    return _groq_pool.create(**kwargs).choices[0].message.content
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -2030,6 +2093,38 @@ def _buscar_titulos() -> List[str]:
     return list({m.get("titulo", "") for m in resultado["metadatas"] if m.get("titulo")})
 
 
+def _buscar_titulos_candidatos(pergunta: str, k: int) -> List[str]:
+    """
+    Retorna até k títulos candidatos (únicos) usando uma busca vetorial rápida
+    nos chunks já existentes. Evita enviar uma lista enorme de títulos ao Groq.
+    """
+    _ensure_db()
+    if not pergunta.strip() or k <= 0:
+        return []
+
+    total_docs = colecao.count()
+    if total_docs <= 0:
+        return []
+
+    n = min(max(5, k * 2), total_docs)  # pega mais chunks para formar k títulos únicos
+    try:
+        res = colecao.query(query_texts=[pergunta], n_results=n)
+    except Exception:
+        return []
+
+    metas = (res.get("metadatas") or [[]])[0] or []
+    out: List[str] = []
+    seen: Set[str] = set()
+    for m in metas:
+        t = (m.get("titulo") or "").strip()
+        if t and t not in seen:
+            seen.add(t)
+            out.append(t)
+        if len(out) >= k:
+            break
+    return out
+
+
 def _classificar_pergunta(pergunta: str, titulos: List[str]) -> dict:
     """
     Usa Groq para classificar a pergunta em:
@@ -2045,15 +2140,7 @@ def _classificar_pergunta(pergunta: str, titulos: List[str]) -> dict:
         usuario=(
             f"Títulos disponíveis:\n{lista}\n\n"
             f"Pergunta: {pergunta}\n\n"
-            "Retorne JSON com exatamente estas chaves:\n"
-            '{\n'
-            '  "tipo": "especifica"|"geral"|"comparativa"|"fora_de_escopo",\n'
-            '  "fonte_alvo": string|null,\n'
-            '  "n_chunks": number,\n'
-            '  "raciocinio": string\n'
-            '}\n\n'
-            "Critério de fora_de_escopo: quando a pergunta pode ser respondida sem consultar a base, "
-            "ou quando não se relaciona ao conteúdo dos títulos.\n"
+            '{"tipo":"especifica"|"geral"|"comparativa"|"fora_de_escopo","fonte_alvo":string|null,"n_chunks":number,"raciocinio":string}'
         ),
         json_mode=True,
     )
@@ -2180,7 +2267,13 @@ def pipeline_perguntar(pergunta: str) -> str:
     3. Responde usando Groq com o contexto encontrado, citando fontes
     4. Anexa aviso médico obrigatório ao final de toda resposta
     """
-    titulos = _buscar_titulos()
+    # Em modo econômico, evita enviar uma lista enorme de títulos ao Groq:
+    # primeiro obtém candidatos via busca vetorial e só cai para a lista completa se necessário.
+    titulos: List[str] = []
+    if GROQ_ECONOMIA:
+        titulos = _buscar_titulos_candidatos(pergunta, GROQ_CLASSIF_TITULOS_MAX)
+    if not titulos:
+        titulos = _buscar_titulos()
     if not titulos:
         return "⚠️  Base de conhecimento vazia. Indexe algum conteúdo primeiro (use --artigos, --video ou --local)."
 
@@ -2200,6 +2293,23 @@ def pipeline_perguntar(pergunta: str) -> str:
             "Se a dúvida for genuinamente não-médica, este sistema não é o recurso adequado."
         )
 
+    # Ajustes de economia pós-classificação (sem remover qualidade quando desligado)
+    if GROQ_ECONOMIA:
+        tipo = str(classificacao.get("tipo", "geral"))
+        padrao = {"especifica": 4, "geral": 6, "comparativa": 8}.get(tipo, 6)
+        alvo = {"especifica": 3, "geral": 4, "comparativa": 6}.get(tipo, max(3, min(6, padrao)))
+        try:
+            n_req = int(classificacao.get("n_chunks", padrao))
+        except Exception:
+            n_req = padrao
+        classificacao["n_chunks"] = max(1, min(n_req, alvo))
+
+    if GROQ_MAX_N_CHUNKS > 0:
+        try:
+            classificacao["n_chunks"] = max(1, min(int(classificacao.get("n_chunks", 6)), GROQ_MAX_N_CHUNKS))
+        except Exception:
+            classificacao["n_chunks"] = min(6, GROQ_MAX_N_CHUNKS)
+
     chunks = _buscar_chunks(pergunta, classificacao)
     if not chunks:
         return (
@@ -2211,62 +2321,66 @@ def pipeline_perguntar(pergunta: str) -> str:
             f"  Base atual: {len(titulos)} fonte(s) indexada(s)."
         )
 
+    # Monta o contexto com limites (economiza tokens sem perder rastreabilidade)
+    chunk_max = GROQ_CONTEXTO_CHUNK_MAX_CHARS
+    total_max = GROQ_CONTEXTO_TOTAL_MAX_CHARS
+    total_chars = 0
+
     blocos = []
     for i, c in enumerate(chunks):
-        tipo_label = "🎬 Vídeo" if c["tipo"] == "video_youtube" else "📄 Artigo"
-        blocos.append(
+        tipo_label = "Vídeo" if c["tipo"] == "video_youtube" else "Artigo"
+        texto = c["texto"] or ""
+        if GROQ_ECONOMIA and chunk_max > 0 and len(texto) > chunk_max:
+            texto = texto[:chunk_max].rstrip() + "\n…"
+
+        bloco = (
             f"[Fonte {i+1} — {tipo_label}]\n"
             f"Título: {c['titulo']}\n"
             f"URL: {c['url']}\n\n"
-            f"{c['texto']}"
+            f"{texto}"
         )
-    contexto = ("\n\n" + "─" * 60 + "\n").join(blocos)
 
-    # Monta sumário de fontes para o modelo ter consciência do que está usando
+        if GROQ_ECONOMIA and total_max > 0:
+            prox = (len(bloco) + (5 if blocos else 0))  # separador aproximado
+            if total_chars + prox > total_max:
+                break
+            total_chars += prox
+
+        blocos.append(
+            bloco
+        )
+    contexto = "\n\n---\n".join(blocos)
+
+    # Fontes únicas para _forcar_secao_fontes_consultadas
     fontes_vistas: dict = {}
     fontes_unicas: List[dict] = []
-    fontes_sumario = []
     for c in chunks:
         chave = (c["titulo"], c["url"])
         if chave not in fontes_vistas:
             fontes_vistas[chave] = len(fontes_vistas) + 1
             fontes_unicas.append({"titulo": c["titulo"], "url": c["url"], "tipo": c["tipo"]})
-            tipo_label = "Vídeo" if c["tipo"] == "video_youtube" else "Artigo"
-            fontes_sumario.append(
-                f"  [Fonte {fontes_vistas[chave]}] {tipo_label}: {c['titulo']}\n"
-                f"            URL: {c['url']}"
-            )
-    fontes_lista_str = "\n".join(fontes_sumario)
 
     mensagem_usuario = (
-        f"═══════════════════════════════════════════\n"
-        f"CONSULTA DO MÉDICO\n"
-        f"═══════════════════════════════════════════\n"
-        f"{pergunta}\n\n"
-        f"═══════════════════════════════════════════\n"
-        f"FONTES DISPONÍVEIS ({len(fontes_vistas)} fonte(s) única(s), {len(chunks)} trecho(s))\n"
-        f"═══════════════════════════════════════════\n"
-        f"{fontes_lista_str}\n\n"
-        f"═══════════════════════════════════════════\n"
-        f"TRECHOS EXTRAÍDOS DA BASE DO DR. AJUDA\n"
-        f"═══════════════════════════════════════════\n"
+        f"CONSULTA: {pergunta}\n\n"
+        f"TRECHOS DA BASE ({len(fontes_vistas)} fonte(s), {len(chunks)} trecho(s)):\n\n"
         f"{contexto}\n\n"
-        f"═══════════════════════════════════════════\n"
-        f"INSTRUÇÕES PARA ESTA RESPOSTA\n"
-        f"═══════════════════════════════════════════\n"
-        f"- Analise a consulta acima com profundidade clínica.\n"
-        f"- Use apenas os trechos fornecidos como base factual.\n"
-        f"- Ao citar dados clínicos, referencie sempre '(Fonte N — Título)'.\n"
-        f"- Se os trechos cobrirem parcialmente a consulta, explicite as lacunas na seção correta.\n"
-        f"- Produza uma resposta que realmente mude o raciocínio ou a conduta do médico:\n"
-        f"  interprete, conecte informações e oriente — não apenas repita os trechos.\n"
+        "Sintetize com base exclusivamente nos trechos acima."
     )
 
     print("  💬 Gerando resposta com Groq...")
+    # Roteia modelo por complexidade (economia sem perder qualidade quando necessário)
+    modelo_resposta = MODELO_POTENTE
+    if GROQ_ECONOMIA:
+        tipo = str(classificacao.get("tipo", "geral"))
+        pergunta_len = len((pergunta or "").strip())
+        # simples e curta → modelo rápido; comparativa/específica longa → mantém potente
+        if tipo in ("geral",) and pergunta_len <= 220:
+            modelo_resposta = MODELO_RAPIDO
+
     resposta = chamar_groq(
         sistema=PROMPT_RESPOSTA_SISTEMA,
         usuario=mensagem_usuario,
-        modelo=MODELO_POTENTE,
+        modelo=modelo_resposta,
     )
     elapsed = time.time() - t0
     print(f"  ✅ Resposta gerada em {elapsed:.1f}s")

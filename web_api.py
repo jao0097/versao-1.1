@@ -13,6 +13,8 @@ API FastAPI que expõe o pipeline RAG clínico para profissionais de saúde.
 import json
 import logging
 import os
+import asyncio
+import secrets  # FIX: adicionado para comparação segura de tokens (timing-safe)
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -22,6 +24,7 @@ from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Request, status
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, field_validator
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -44,7 +47,9 @@ if _LOG_FORMAT == "json":
     class _JsonFormatter(logging.Formatter):
         def format(self, record: logging.LogRecord) -> str:
             log_obj = {
-                "ts": datetime.utcnow().isoformat() + "Z",
+                # FIX: o método utcnow estava deprecado desde Python 3.12
+                # Corrigido para datetime.now(timezone.utc) — timezone-aware e sem warning
+                "ts": datetime.now(timezone.utc).isoformat(),
                 "level": record.levelname,
                 "logger": record.name,
                 "msg": record.getMessage(),
@@ -168,9 +173,17 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+# Semáforo: limita chamadas simultâneas ao Groq para evitar rate limit da API.
+# Com 10 usuários e pipeline de ~10-60s cada, 5 slots paralelos é conservador e seguro.
+# Aumente para 8 se o plano Groq permitir mais concorrência.
+_groq_semaphore = asyncio.Semaphore(5)
+
 # Templates Jinja2 (pasta templates/ ou fallback inline)
 _TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "templates")
 templates = Jinja2Templates(directory=_TEMPLATES_DIR) if os.path.isdir(_TEMPLATES_DIR) else None
+_STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+if os.path.isdir(_STATIC_DIR):
+    app.mount("/static", StaticFiles(directory=_STATIC_DIR), name="static")
 
 # ══════════════════════════════════════════════════════════════════════════════
 #  AUTENTICAÇÃO: Bearer Token estático
@@ -185,6 +198,10 @@ def _verificar_token(
     """
     Valida o token Bearer. Retorna 401 se inválido ou ausente.
     Nunca loga o token recebido.
+
+    FIX: usa secrets.compare_digest() em vez de == para comparação em tempo
+    constante, prevenindo timing attacks que poderiam revelar o token por
+    diferença de tempo de resposta.
     """
     if not _WEB_TOKEN:
         raise HTTPException(
@@ -192,7 +209,8 @@ def _verificar_token(
             detail="Servidor mal configurado: WEB_TOKEN não definido.",
         )
     token = credentials.credentials if credentials else None
-    if not token or token != _WEB_TOKEN:
+    # FIX: comparação timing-safe (evita timing attack via diferença de latência)
+    if not token or not secrets.compare_digest(token, _WEB_TOKEN):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token de acesso inválido ou ausente. Contate o administrador.",
@@ -303,7 +321,7 @@ def status_base(request: Request) -> JSONResponse:
     dependencies=[Depends(_verificar_token)],
 )
 @limiter.limit("10/minute")
-def consultar(
+async def consultar(
     request: Request,
     body: ConsultaRequest,
 ) -> ConsultaResponse:
@@ -312,6 +330,7 @@ def consultar(
     - Timeout efetivo: 90s (configurado no Uvicorn)
     - Rate limit: 10 req/min por IP
     - Nunca loga o conteúdo da pergunta ou resposta (LGPD)
+    - Semáforo interno: máx. 5 chamadas simultâneas ao Groq
     """
     sup = request.app.state.sup
     ip_addr = get_remote_address(request)
@@ -341,7 +360,16 @@ def consultar(
 
     t0 = time.time()
     try:
-        resposta = sup.pipeline_perguntar(body.pergunta)
+        # Semáforo: evita sobrecarregar o Groq com mais de 5 chamadas simultâneas.
+        # run_in_executor: libera o event loop enquanto o pipeline bloqueante roda
+        # na threadpool — outros usuários continuam sendo atendidos durante a espera.
+        async with _groq_semaphore:
+            loop = asyncio.get_event_loop()
+            resposta = await loop.run_in_executor(
+                None,
+                sup.pipeline_perguntar,
+                body.pergunta,
+            )
     except Exception as exc:
         elapsed = time.time() - t0
         logger.error(
@@ -382,7 +410,7 @@ def consultar(
     tags=["Consulta"],
 )
 @limiter.limit("10/minute")
-def consultar_stream(
+async def consultar_stream(
     request: Request,
     pergunta: str,
     token: str,
@@ -391,11 +419,11 @@ def consultar_stream(
     Executa o pipeline RAG e transmite a resposta progressivamente via SSE.
     Parâmetros: ?pergunta=<string>&token=<bearer_token>
 
-    Como o pipeline_perguntar é bloqueante, a resposta é enviada de uma vez
-    ao final — mas o SSE mantém conexão aberta e evita timeout do browser.
+    Usa run_in_executor + semáforo para não bloquear o event loop durante
+    a chamada ao Groq — outros usuários continuam sendo atendidos em paralelo.
     """
-    # Autenticação via query param (SSE não suporta headers no browser)
-    if not _WEB_TOKEN or token != _WEB_TOKEN:
+    # FIX: comparação timing-safe — previne timing attack via latência de resposta
+    if not _WEB_TOKEN or not secrets.compare_digest(token or "", _WEB_TOKEN):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token inválido.",
@@ -416,8 +444,7 @@ def consultar_stream(
     sup = request.app.state.sup
     ip_addr = get_remote_address(request)
 
-    def _event_generator():
-        # Sinaliza ao cliente que o processamento começou
+    async def _event_generator():
         yield "data: {\"tipo\": \"inicio\"}\n\n"
 
         t0 = time.time()
@@ -428,7 +455,13 @@ def consultar_stream(
         )
 
         try:
-            resposta = sup.pipeline_perguntar(pergunta)
+            async with _groq_semaphore:
+                loop = asyncio.get_event_loop()
+                resposta = await loop.run_in_executor(
+                    None,
+                    sup.pipeline_perguntar,
+                    pergunta,
+                )
             elapsed = time.time() - t0
 
             logger.info(
@@ -477,19 +510,31 @@ def consultar_stream(
 
 @app.get(
     "/",
+    summary="Landing page pública",
+    tags=["Interface"],
+    response_class=HTMLResponse,
+)
+def landing_page(request: Request) -> HTMLResponse:
+    """Serve a landing page pública do sistema."""
+    if templates:
+        return templates.TemplateResponse("landing.html", {"request": request})
+    return HTMLResponse(content=_LANDING_EMBUTIDO, status_code=200)
+
+
+@app.get(
+    "/app",
     summary="Interface web",
     tags=["Interface"],
     response_class=HTMLResponse,
 )
-def interface_web(request: Request) -> HTMLResponse:
+def interface_app(request: Request) -> HTMLResponse:
     """
     Serve a interface HTML do sistema SUP.
     A autenticação é feita no lado do cliente via sessionStorage + Bearer token.
     """
-    # Lê o HTML do template se disponível, senão usa o embutido
     if templates:
         return templates.TemplateResponse("index.html", {"request": request})
-    return HTMLResponse(content=_HTML_EMBUTIDO, status_code=200)
+    return HTMLResponse(content=_APP_EMBUTIDO, status_code=200)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -524,7 +569,20 @@ async def generic_exception_handler(request: Request, exc: Exception) -> JSONRes
 #  HTML EMBUTIDO (fallback se pasta templates/ não existir)
 # ══════════════════════════════════════════════════════════════════════════════
 
-_HTML_EMBUTIDO = open(
+_LANDING_EMBUTIDO = open(
+    os.path.join(os.path.dirname(__file__), "templates", "landing.html"),
+    encoding="utf-8",
+).read() if os.path.exists(
+    os.path.join(os.path.dirname(__file__), "templates", "landing.html")
+) else """<!DOCTYPE html>
+<html lang="pt-BR">
+<head><meta charset="UTF-8"><title>SUP — Apresentacao</title></head>
+<body>
+<p>⚠️ Landing não encontrada. Crie templates/landing.html.</p>
+</body>
+</html>"""
+
+_APP_EMBUTIDO = open(
     os.path.join(os.path.dirname(__file__), "templates", "index.html"),
     encoding="utf-8",
 ).read() if os.path.exists(
@@ -533,7 +591,7 @@ _HTML_EMBUTIDO = open(
 <html lang="pt-BR">
 <head><meta charset="UTF-8"><title>SUP — Dr. Ajuda</title></head>
 <body>
-<p>⚠️ Template não encontrado. Crie templates/index.html ou execute docker compose.</p>
+<p>⚠️ App não encontrada. Crie templates/index.html ou execute docker compose.</p>
 </body>
 </html>"""
 
